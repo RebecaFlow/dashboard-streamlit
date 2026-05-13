@@ -188,6 +188,58 @@ with tab_actual:
 
     c1, c2 = st.columns(2)
 
+    st.markdown("<br>", unsafe_allow_html=True)
+
+st.markdown(
+    f"""
+    <div style="
+        background:white;
+        padding:18px;
+        border-radius:16px;
+        border:1px solid #dbe3ef;
+        margin-bottom:20px;
+    ">
+    <h4 style="margin-top:0;">
+        TAT Cliente Total
+        <span style="color:#2563eb;">
+            {actual.get("tat_cliente")} dias
+        </span>
+    </h4>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+if not mensal.empty:
+
+    tabela = mensal.copy()
+
+    tabela["VOL."] = tabela["volume"]
+    tabela["TAT CLI"] = tabela["tat_cliente"].astype(str) + "d"
+    tabela["TAT REP"] = tabela["tat_reparador"].astype(str) + "d"
+    tabela["TAT S/REP"] = tabela["tat_sem"].astype(str) + "d"
+    tabela["% REP"] = tabela["%rep"].astype(str) + "%"
+    tabela["TX SUCESSO"] = tabela["tx_sucesso"].astype(str) + "%"
+
+    tabela = tabela.rename(columns={
+        "mes": "MES"
+    })
+
+    st.dataframe(
+        tabela[
+            [
+                "MES",
+                "VOL.",
+                "TAT CLI",
+                "TAT REP",
+                "TAT S/REP",
+                "% REP",
+                "TX SUCESSO"
+            ]
+        ],
+        use_container_width=True,
+        hide_index=True
+    )
     with c1:
         st.markdown('<div class="section-title">TAT por mês</div>', unsafe_allow_html=True)
 

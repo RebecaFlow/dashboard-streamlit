@@ -25,11 +25,11 @@ st.markdown("""
 
 .block-container {
     padding-top: 1rem;
-    max-width: 1600px;
+    max-width: 1650px;
 }
 
 .header {
-    background: linear-gradient(90deg,#111827,#1e3a8a);
+    background: #111827;
     padding: 24px;
     border-radius: 18px;
     color: white;
@@ -38,24 +38,31 @@ st.markdown("""
 
 .kpi-card {
     background: white;
-    padding: 18px;
-    border-radius: 16px;
-    border: 1px solid #e5e7eb;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.04);
-    height: 118px;
+    padding: 16px;
+    border-radius: 14px;
+    border: 1px solid #dbe3ef;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    height: 108px;
+    border-top: 4px solid #2563eb;
 }
 
 .kpi-label {
-    font-size: 12px;
+    font-size: 11px;
     color: #64748b;
     text-transform: uppercase;
     font-weight: 700;
 }
 
 .kpi-value {
-    font-size: 32px;
+    font-size: 29px;
     font-weight: 800;
     color: #111827;
+    margin-top: 4px;
+}
+
+.kpi-sub {
+    font-size: 12px;
+    color: #64748b;
 }
 
 .big-blue {
@@ -96,6 +103,13 @@ def load_json(url):
     return r.json()
 
 
+def fmt(value, suffix=""):
+    if value is None:
+        return "-"
+
+    return f"{value}{suffix}"
+
+
 actual = load_json(URLS["actual"])
 historico = pd.DataFrame(load_json(URLS["historico"]))
 mensal = pd.DataFrame(load_json(URLS["mensal"]))
@@ -116,26 +130,39 @@ tab_actual, tab_hist = st.tabs(["📊 Visão Actual", "📈 Histórico"])
 
 
 with tab_actual:
-    col1, col2, col3, col4, col5 = st.columns(5)
 
-    kpis = [
-        ("Ordens", actual.get("ordens", "-")),
-        ("TAT Cliente", f'{actual.get("tat_cliente", "-")}d'),
-        ("TAT Reparador", f'{actual.get("tat_reparador", "-")}d'),
-        ("TAT sem Reparador", f'{actual.get("tat_sem_reparador", "-")}d'),
-        ("% Rep / Cliente", f'{actual.get("peso_rep_cliente", "-")}%'),
+    kpis_linha1 = [
+        ("Ordens", fmt(actual.get("ordens")), "Work orders"),
+        ("TAT Cliente", fmt(actual.get("tat_cliente"), "d"), "Média end-to-end"),
+        ("TAT Reparador", fmt(actual.get("tat_reparador"), "d"), "Tempo no fornecedor"),
+        ("TAT sem Reparador", fmt(actual.get("tat_sem_reparador"), "d"), "Logística total"),
+        ("% Rep / Cliente", fmt(actual.get("peso_rep_cliente"), "%"), "Peso reparador"),
+        ("Taxa Sucesso", fmt(actual.get("taxa_sucesso"), "%"), "Rep+SemAvar+Troca"),
     ]
 
-    for col, (label, value) in zip([col1, col2, col3, col4, col5], kpis):
-        with col:
-            st.markdown(f"""
-            <div class="kpi-card">
-                <div class="kpi-label">{label}</div>
-                <div class="kpi-value">{value}</div>
-            </div>
-            """, unsafe_allow_html=True)
+    kpis_linha2 = [
+        ("SLA <= 30D", fmt(actual.get("sla_30"), "%"), "Cumprimento target"),
+        ("SLA <= 8D", fmt(actual.get("sla_8"), "%"), "Target curto prazo"),
+        ("S/ Entrada Rep.", fmt(actual.get("sem_entrada_rep"), "%"), "Excl. Assistência 35"),
+        ("Mediana Cli", fmt(actual.get("mediana_cliente"), "d"), "P50 TAT Cliente"),
+        ("P75 TAT Cli", fmt(actual.get("p75_tat_cliente"), "d"), "Percentil 75"),
+        ("Mediana Rep", fmt(actual.get("mediana_reparador"), "d"), "P50 TAT Reparador"),
+    ]
 
-    st.markdown("<br>", unsafe_allow_html=True)
+    for linha in [kpis_linha1, kpis_linha2]:
+        cols = st.columns(6)
+
+        for col, (label, value, subtitle) in zip(cols, linha):
+            with col:
+                st.markdown(f"""
+                <div class="kpi-card">
+                    <div class="kpi-label">{label}</div>
+                    <div class="kpi-value">{value}</div>
+                    <div class="kpi-sub">{subtitle}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
 
     a, b = st.columns(2)
 
@@ -143,7 +170,7 @@ with tab_actual:
         st.markdown(f"""
         <div class="big-blue">
             <h3 style="color:white;">🔧 TAT Reparador</h3>
-            <div class="metric-big">{actual.get("tat_reparador", "-")}d</div>
+            <div class="metric-big">{fmt(actual.get("tat_reparador"), "d")}</div>
             <p>Tempo médio em reparador</p>
         </div>
         """, unsafe_allow_html=True)
@@ -152,7 +179,7 @@ with tab_actual:
         st.markdown(f"""
         <div class="big-orange">
             <h3 style="color:white;">🚚 TAT sem Reparador</h3>
-            <div class="metric-big">{actual.get("tat_sem_reparador", "-")}d</div>
+            <div class="metric-big">{fmt(actual.get("tat_sem_reparador"), "d")}</div>
             <p>Tempo médio fora do reparador</p>
         </div>
         """, unsafe_allow_html=True)
@@ -166,6 +193,7 @@ with tab_actual:
 
         if not mensal.empty:
             mensal = mensal.sort_values("mes")
+
             fig = go.Figure()
             fig.add_trace(go.Scatter(x=mensal["mes"], y=mensal["tat_cliente"], mode="lines+markers", name="TAT Cliente"))
             fig.add_trace(go.Scatter(x=mensal["mes"], y=mensal["tat_reparador"], mode="lines+markers", name="TAT Reparador"))
@@ -217,17 +245,20 @@ with tab_actual:
                 orientation="h",
                 hover_data=["volume"]
             )
+
             fig.update_layout(
                 height=360,
                 template="plotly_white",
                 margin=dict(l=10, r=10, t=20, b=10)
             )
+
             st.plotly_chart(fig, use_container_width=True)
 
     c5, c6, c7 = st.columns(3)
 
     with c5:
         st.markdown('<div class="section-title">Top marcas</div>', unsafe_allow_html=True)
+
         if not marcas.empty:
             fig = px.bar(marcas, x="volume", y="marca", orientation="h")
             fig.update_layout(height=320, template="plotly_white", margin=dict(l=10, r=10, t=20, b=10))
@@ -235,6 +266,7 @@ with tab_actual:
 
     with c6:
         st.markdown('<div class="section-title">Top categorias</div>', unsafe_allow_html=True)
+
         if not categorias.empty:
             fig = px.bar(categorias, x="volume", y="categoria", orientation="h")
             fig.update_layout(height=320, template="plotly_white", margin=dict(l=10, r=10, t=20, b=10))
@@ -242,6 +274,7 @@ with tab_actual:
 
     with c7:
         st.markdown('<div class="section-title">Top lojas</div>', unsafe_allow_html=True)
+
         if not lojas.empty:
             fig = px.bar(lojas, x="volume", y="loja", orientation="h")
             fig.update_layout(height=320, template="plotly_white", margin=dict(l=10, r=10, t=20, b=10))

@@ -4,53 +4,86 @@ import requests
 import plotly.express as px
 import plotly.graph_objects as go
 
-st.set_page_config(page_title="Journey - Service Operations Dashboard", layout="wide")
+st.set_page_config(page_title="Journey Dashboard", layout="wide")
 
 BASE_URL = "https://process-dashboard-file.s3.eu-north-1.amazonaws.com/processed"
-DATA_ATUAL_URL = f"{BASE_URL}/dashboard-data.json"
-HISTORICO_URL = f"{BASE_URL}/historico-tat.json"
+
+URLS = {
+    "actual": f"{BASE_URL}/dashboard-data.json",
+    "historico": f"{BASE_URL}/historico-tat.json",
+    "mensal": f"{BASE_URL}/mensal.json",
+    "motivos": f"{BASE_URL}/motivos-fecho.json",
+    "reparadores": f"{BASE_URL}/reparadores.json",
+    "lojas": f"{BASE_URL}/lojas.json",
+    "marcas": f"{BASE_URL}/marcas.json",
+    "categorias": f"{BASE_URL}/categorias.json",
+}
 
 st.markdown("""
 <style>
+.stApp { background-color: #f3f6fb; }
+
 .block-container {
     padding-top: 1rem;
-    background-color: #f5f7fb;
+    max-width: 1600px;
 }
 
 .header {
-    background-color: #111827;
-    padding: 22px;
-    border-radius: 0 0 14px 14px;
+    background: linear-gradient(90deg,#111827,#1e3a8a);
+    padding: 24px;
+    border-radius: 18px;
     color: white;
-    margin-bottom: 20px;
+    margin-bottom: 22px;
 }
 
 .kpi-card {
-    background-color: white;
+    background: white;
     padding: 18px;
-    border-radius: 14px;
+    border-radius: 16px;
     border: 1px solid #e5e7eb;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+    height: 118px;
 }
 
 .kpi-label {
     font-size: 12px;
     color: #64748b;
     text-transform: uppercase;
+    font-weight: 700;
 }
 
 .kpi-value {
-    font-size: 30px;
-    font-weight: 700;
+    font-size: 32px;
+    font-weight: 800;
     color: #111827;
 }
 
-.section-card {
-    background-color: white;
-    padding: 20px;
-    border-radius: 16px;
-    border: 1px solid #e5e7eb;
-    margin-bottom: 18px;
+.big-blue {
+    background: linear-gradient(135deg,#2563eb,#60a5fa);
+    color: white;
+    padding: 30px;
+    border-radius: 18px;
+    text-align: center;
+}
+
+.big-orange {
+    background: linear-gradient(135deg,#ea580c,#fb923c);
+    color: white;
+    padding: 30px;
+    border-radius: 18px;
+    text-align: center;
+}
+
+.metric-big {
+    font-size: 52px;
+    font-weight: 800;
+}
+
+.section-title {
+    font-weight: 800;
+    font-size: 20px;
+    margin-top: 8px;
+    margin-bottom: 8px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -63,229 +96,183 @@ def load_json(url):
     return r.json()
 
 
-actual = load_json(DATA_ATUAL_URL)
-historico = load_json(HISTORICO_URL)
-
-df_hist = pd.DataFrame(historico)
-
-if not df_hist.empty:
-    df_hist["data_snapshot"] = pd.to_datetime(df_hist["data_snapshot"])
-
+actual = load_json(URLS["actual"])
+historico = pd.DataFrame(load_json(URLS["historico"]))
+mensal = pd.DataFrame(load_json(URLS["mensal"]))
+motivos = pd.DataFrame(load_json(URLS["motivos"]))
+reparadores = pd.DataFrame(load_json(URLS["reparadores"]))
+lojas = pd.DataFrame(load_json(URLS["lojas"]))
+marcas = pd.DataFrame(load_json(URLS["marcas"]))
+categorias = pd.DataFrame(load_json(URLS["categorias"]))
 
 st.markdown("""
 <div class="header">
-    <h2>Journey - Service Operations Dashboard</h2>
-    <p>Jan–Mai 2026</p>
+    <h2 style="color:white;margin-bottom:0;">Journey - Service Operations Dashboard</h2>
+    <p style="margin-bottom:0;">Dados actuais + evolução histórica automática</p>
 </div>
 """, unsafe_allow_html=True)
 
+tab_actual, tab_hist = st.tabs(["📊 Visão Actual", "📈 Histórico"])
 
-# KPIs
-col1, col2, col3, col4, col5, col6 = st.columns(6)
 
-kpis = [
-    ("Ordens", actual.get("total_linhas", 0)),
-    ("TAT Cliente", actual.get("tat_cliente_medio", "-")),
-    ("TAT Reparador", actual.get("tat_reparador_medio", "-")),
-    ("TAT sem Reparador", actual.get("tat_sem_reparador_medio", "-")),
-    ("% Rep / Cliente", "-"),
-    ("Taxa Sucesso", "-"),
-]
+with tab_actual:
+    col1, col2, col3, col4, col5 = st.columns(5)
 
-for col, (label, value) in zip([col1, col2, col3, col4, col5, col6], kpis):
-    with col:
+    kpis = [
+        ("Ordens", actual.get("ordens", "-")),
+        ("TAT Cliente", f'{actual.get("tat_cliente", "-")}d'),
+        ("TAT Reparador", f'{actual.get("tat_reparador", "-")}d'),
+        ("TAT sem Reparador", f'{actual.get("tat_sem_reparador", "-")}d'),
+        ("% Rep / Cliente", f'{actual.get("peso_rep_cliente", "-")}%'),
+    ]
+
+    for col, (label, value) in zip([col1, col2, col3, col4, col5], kpis):
+        with col:
+            st.markdown(f"""
+            <div class="kpi-card">
+                <div class="kpi-label">{label}</div>
+                <div class="kpi-value">{value}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    a, b = st.columns(2)
+
+    with a:
         st.markdown(f"""
-        <div class="kpi-card">
-            <div class="kpi-label">{label}</div>
-            <div class="kpi-value">{value}</div>
+        <div class="big-blue">
+            <h3 style="color:white;">🔧 TAT Reparador</h3>
+            <div class="metric-big">{actual.get("tat_reparador", "-")}d</div>
+            <p>Tempo médio em reparador</p>
         </div>
         """, unsafe_allow_html=True)
 
+    with b:
+        st.markdown(f"""
+        <div class="big-orange">
+            <h3 style="color:white;">🚚 TAT sem Reparador</h3>
+            <div class="metric-big">{actual.get("tat_sem_reparador", "-")}d</div>
+            <p>Tempo médio fora do reparador</p>
+        </div>
+        """, unsafe_allow_html=True)
 
-st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    c1, c2 = st.columns(2)
+
+    with c1:
+        st.markdown('<div class="section-title">TAT por mês</div>', unsafe_allow_html=True)
+
+        if not mensal.empty:
+            mensal = mensal.sort_values("mes")
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=mensal["mes"], y=mensal["tat_cliente"], mode="lines+markers", name="TAT Cliente"))
+            fig.add_trace(go.Scatter(x=mensal["mes"], y=mensal["tat_reparador"], mode="lines+markers", name="TAT Reparador"))
+            fig.add_trace(go.Scatter(x=mensal["mes"], y=mensal["tat_sem"], mode="lines+markers", name="TAT sem Reparador"))
+
+            fig.update_layout(
+                height=360,
+                template="plotly_white",
+                margin=dict(l=10, r=10, t=20, b=10),
+                legend=dict(orientation="h")
+            )
+
+            st.plotly_chart(fig, use_container_width=True)
+
+    with c2:
+        st.markdown('<div class="section-title">Volume por mês</div>', unsafe_allow_html=True)
+
+        if not mensal.empty:
+            fig = px.bar(mensal.sort_values("mes"), x="mes", y="volume")
+            fig.update_layout(
+                height=360,
+                template="plotly_white",
+                margin=dict(l=10, r=10, t=20, b=10)
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+    c3, c4 = st.columns(2)
+
+    with c3:
+        st.markdown('<div class="section-title">Motivos de fecho</div>', unsafe_allow_html=True)
+
+        if not motivos.empty:
+            fig = px.pie(motivos, names="motivo", values="valor", hole=0.55)
+            fig.update_layout(
+                height=360,
+                template="plotly_white",
+                margin=dict(l=10, r=10, t=20, b=10)
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+    with c4:
+        st.markdown('<div class="section-title">Top reparadores por TAT</div>', unsafe_allow_html=True)
+
+        if not reparadores.empty:
+            fig = px.bar(
+                reparadores.sort_values("tat", ascending=True),
+                x="tat",
+                y="reparador",
+                orientation="h",
+                hover_data=["volume"]
+            )
+            fig.update_layout(
+                height=360,
+                template="plotly_white",
+                margin=dict(l=10, r=10, t=20, b=10)
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+    c5, c6, c7 = st.columns(3)
+
+    with c5:
+        st.markdown('<div class="section-title">Top marcas</div>', unsafe_allow_html=True)
+        if not marcas.empty:
+            fig = px.bar(marcas, x="volume", y="marca", orientation="h")
+            fig.update_layout(height=320, template="plotly_white", margin=dict(l=10, r=10, t=20, b=10))
+            st.plotly_chart(fig, use_container_width=True)
+
+    with c6:
+        st.markdown('<div class="section-title">Top categorias</div>', unsafe_allow_html=True)
+        if not categorias.empty:
+            fig = px.bar(categorias, x="volume", y="categoria", orientation="h")
+            fig.update_layout(height=320, template="plotly_white", margin=dict(l=10, r=10, t=20, b=10))
+            st.plotly_chart(fig, use_container_width=True)
+
+    with c7:
+        st.markdown('<div class="section-title">Top lojas</div>', unsafe_allow_html=True)
+        if not lojas.empty:
+            fig = px.bar(lojas, x="volume", y="loja", orientation="h")
+            fig.update_layout(height=320, template="plotly_white", margin=dict(l=10, r=10, t=20, b=10))
+            st.plotly_chart(fig, use_container_width=True)
 
 
-# Filtros
-st.markdown('<div class="section-card">', unsafe_allow_html=True)
-st.subheader("📊 Journey do Processo de Reparação")
+with tab_hist:
+    st.markdown('<div class="section-title">Evolução histórica dos KPIs</div>', unsafe_allow_html=True)
 
-f1, f2, f3 = st.columns(3)
+    if not historico.empty:
+        historico["data_snapshot"] = pd.to_datetime(historico["data_snapshot"])
 
-with f1:
-    filtro_rep = st.selectbox("Reparador", ["Todos"])
-
-with f2:
-    filtro_marca = st.selectbox("Marca", ["Todas"])
-
-with f3:
-    filtro_categoria = st.selectbox("Categoria", ["Todas"])
-
-st.markdown("</div>", unsafe_allow_html=True)
-
-
-# Blocos grandes TAT
-col_a, col_b = st.columns(2)
-
-with col_a:
-    st.markdown(f"""
-    <div style="background:#2563eb;color:white;padding:35px;border-radius:16px;text-align:center;">
-        <h4>🔧 TAT Reparador</h4>
-        <h1>{actual.get("tat_reparador_medio", "-")}d</h1>
-    </div>
-    """, unsafe_allow_html=True)
-
-with col_b:
-    st.markdown(f"""
-    <div style="background:#f97316;color:white;padding:35px;border-radius:16px;text-align:center;">
-        <h4>🚚 TAT sem Reparador</h4>
-        <h1>{actual.get("tat_sem_reparador_medio", "-")}d</h1>
-    </div>
-    """, unsafe_allow_html=True)
-
-
-st.markdown("<br>", unsafe_allow_html=True)
-
-
-# Gráficos principais
-col1, col2 = st.columns(2)
-
-with col1:
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
-    st.subheader("TAT total e reparador por mês")
-
-    if not df_hist.empty:
-        chart_df = df_hist.copy()
         fig = go.Figure()
-
-        fig.add_trace(go.Scatter(
-            x=chart_df["data_snapshot"],
-            y=chart_df["tat_cliente_medio"],
-            mode="lines+markers",
-            name="TAT Cliente"
-        ))
-
-        fig.add_trace(go.Scatter(
-            x=chart_df["data_snapshot"],
-            y=chart_df["tat_reparador_medio"],
-            mode="lines+markers",
-            name="Reparador"
-        ))
-
-        fig.add_trace(go.Scatter(
-            x=chart_df["data_snapshot"],
-            y=chart_df["tat_sem_reparador_medio"],
-            mode="lines+markers",
-            name="Sem Reparador",
-            line=dict(dash="dot")
-        ))
-
-        fig.update_layout(height=350, margin=dict(l=10, r=10, t=20, b=10))
-        st.plotly_chart(fig, use_container_width=True)
-
-    st.markdown("</div>", unsafe_allow_html=True)
-
-
-with col2:
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
-    st.subheader("Indicadores Operacionais")
-
-    if not df_hist.empty:
-        fig = go.Figure()
-
-        fig.add_trace(go.Bar(
-            x=df_hist["data_snapshot"],
-            y=df_hist["total_linhas"],
-            name="Ordens"
-        ))
-
-        fig.add_trace(go.Scatter(
-            x=df_hist["data_snapshot"],
-            y=df_hist["processos_concluidos"],
-            mode="lines+markers",
-            name="Processos concluídos",
-            yaxis="y2"
-        ))
+        fig.add_trace(go.Scatter(x=historico["data_snapshot"], y=historico["tat_cliente"], mode="lines+markers", name="TAT Cliente"))
+        fig.add_trace(go.Scatter(x=historico["data_snapshot"], y=historico["tat_reparador"], mode="lines+markers", name="TAT Reparador"))
+        fig.add_trace(go.Scatter(x=historico["data_snapshot"], y=historico["tat_sem_reparador"], mode="lines+markers", name="TAT sem Reparador"))
 
         fig.update_layout(
-            height=350,
+            height=420,
+            template="plotly_white",
             margin=dict(l=10, r=10, t=20, b=10),
-            yaxis=dict(title="Ordens"),
-            yaxis2=dict(title="Concluídos", overlaying="y", side="right")
+            legend=dict(orientation="h")
         )
 
         st.plotly_chart(fig, use_container_width=True)
 
-    st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Volume histórico</div>', unsafe_allow_html=True)
 
+        fig2 = px.bar(historico, x="data_snapshot", y="ordens")
+        fig2.update_layout(height=320, template="plotly_white", margin=dict(l=10, r=10, t=20, b=10))
+        st.plotly_chart(fig2, use_container_width=True)
 
-# Segunda linha
-col3, col4, col5 = st.columns([1, 1, 1])
-
-with col3:
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
-    st.subheader("Decomposição TAT")
-
-    tat_rep = actual.get("tat_reparador_medio") or 0
-    tat_sem = actual.get("tat_sem_reparador_medio") or 0
-
-    decomp = pd.DataFrame({
-        "Tipo": ["TAT Reparador", "TAT sem Reparador"],
-        "Valor": [tat_rep, tat_sem]
-    })
-
-    fig = px.bar(decomp, x="Valor", y="Tipo", orientation="h")
-    fig.update_layout(height=280, margin=dict(l=10, r=10, t=10, b=10))
-    st.plotly_chart(fig, use_container_width=True)
-    st.markdown("</div>", unsafe_allow_html=True)
-
-
-with col4:
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
-    st.subheader("Reparador vs sem Reparador")
-
-    if not df_hist.empty:
-        fig = go.Figure()
-
-        fig.add_trace(go.Bar(
-            x=df_hist["data_snapshot"],
-            y=df_hist["tat_reparador_medio"],
-            name="Reparador"
-        ))
-
-        fig.add_trace(go.Bar(
-            x=df_hist["data_snapshot"],
-            y=df_hist["tat_sem_reparador_medio"],
-            name="Sem Reparador"
-        ))
-
-        fig.update_layout(
-            barmode="stack",
-            height=280,
-            margin=dict(l=10, r=10, t=10, b=10)
-        )
-
-        st.plotly_chart(fig, use_container_width=True)
-
-    st.markdown("</div>", unsafe_allow_html=True)
-
-
-with col5:
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
-    st.subheader("Motivo de Fecho")
-
-    motivos = pd.DataFrame({
-        "Motivo": ["Reparação ok", "Sem avaria", "Troca", "Não reparado"],
-        "Peso": [65, 15, 12, 8]
-    })
-
-    fig = px.pie(motivos, names="Motivo", values="Peso", hole=0.55)
-    fig.update_layout(height=280, margin=dict(l=10, r=10, t=10, b=10))
-    st.plotly_chart(fig, use_container_width=True)
-    st.markdown("</div>", unsafe_allow_html=True)
-
-
-# Histórico
-st.markdown('<div class="section-card">', unsafe_allow_html=True)
-st.subheader("Histórico")
-st.dataframe(df_hist, use_container_width=True)
-st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Tabela histórica</div>', unsafe_allow_html=True)
+        st.dataframe(historico, use_container_width=True)

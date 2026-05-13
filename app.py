@@ -218,6 +218,13 @@ if not mensal.empty:
     tabela["TAT CLI"] = tabela["tat_cliente"].astype(str) + "d"
     tabela["TAT REP"] = tabela["tat_reparador"].astype(str) + "d"
     tabela["TAT S/REP"] = tabela["tat_sem"].astype(str) + "d"
+
+if "%rep" not in tabela.columns:
+    tabela["%rep"] = round((tabela["tat_reparador"] / tabela["tat_cliente"]) * 100, 1)
+
+if "tx_sucesso" not in tabela.columns:
+    tabela["tx_sucesso"] = actual.get("taxa_sucesso")
+    
     tabela["% REP"] = tabela["%rep"].astype(str) + "%"
     tabela["TX SUCESSO"] = tabela["tx_sucesso"].astype(str) + "%"
 
